@@ -77,7 +77,15 @@ def Modulize(B):
 
 	count=0
 	k=0
+	xcount = 0
+	Q0 = Q
 	while True:
+		
+		xcount+=1
+		if xcount%N==0: 
+			if Q>Q0: Q0 = Q
+			else: break
+		
 		i = Nx[k]
 		
 		ci = M[i]
@@ -103,7 +111,7 @@ def Modulize(B):
 			break
 		k+=1
 		if k>=N: k=0
-	 
+			 
 	return C,Q
 
 #~ 
@@ -262,6 +270,47 @@ def ToCorrelation(XR,n=10, ncpu=1,hierarchy=False):
 		H.append(h.astype(int))
 		
 		if set(h)==N: break
+	return H
+
+def ToCorrelation2Level(XR,n=10, ncpu=1,hierarchy=False):
+	N,M = XR.shape
+	A = np.corrcoef(XR)
+	B = RMT(A,(N,M),'Pos_wMod')
+
+	H = [LoivenModM(B,n,ncpu)[0].astype(int)]
+
+	if hierarchy==False:
+		return H
+
+	while True:
+		
+		M = H[-1]
+		cx = Counter(M)
+		if cx.most_common()[0][1]/float(N)<0.8: break
+		
+		mx,h = 0,np.zeros(N)
+		
+		size = Counter(M)
+		#~ print "Level %d"%len(H)
+		for c in set(M):
+			if size[c]>1:
+				Bs, XRs = deepcopy(B),deepcopy(XR)
+				XRs = XRs[np.where(M==c)]
+				As = np.corrcoef(XRs)
+				
+				Bs = RMT(As,XRs.shape,'Pos')
+				Ms,q = LoivenModM(Bs,n,ncpu)
+				h[np.where(M==c)] = Ms+mx
+				mx = h.max()+1
+			else:
+				h[np.where(M==c)] = mx
+				mx+=1
+
+		if len(set(h))==len(set(H[-1])): break
+		H.append(h.astype(int))
+		
+		if set(h)==N: break
+		break
 	return H
 
 #~ 
