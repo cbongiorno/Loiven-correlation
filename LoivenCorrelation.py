@@ -11,7 +11,11 @@ from multiprocessing import Pool
 import random as rd
 from copy import deepcopy
 
-def RMT(A,(N,M),method='PosNeg'):
+def floatingPointError(H):
+	H[np.logical_and(H<1e-12,H>-1e-12)]=0
+	return H
+
+def RMT(A,(N,M),method='Pos'):
 	'''
 	'Input Correlation Matrix, Dimension of TimeSeries (N,M),method'+
 	' "PosNeg" take out l{max} and l-<l<+l; "PosNeg_wMod" take out just l-<l<+l;'
@@ -26,31 +30,23 @@ def RMT(A,(N,M),method='PosNeg'):
 	
 	l,v = zip(*sorted(zip(l,v),reverse=True,key=lambda x:x[0]))
 
+	
 
 	Cm =(np.outer(v[0],v[0])*l[0]).real
+	Cr = np.zeros((len(l),len(l)))
 
-	Crp = np.zeros((len(l),len(l)))
-	Crm = np.zeros((len(l),len(l)))
 	for i in range(len(l)):
-		if Lm<l[i]<LM:
+		if l[i]<LM:
 			S = np.outer(v[i],v[i])*l[i]
-			Crp+= S.real
-		elif l[i]<Lm:
-			S = np.outer(v[i],v[i])*l[i]
-			Crm+= S.real
+			Cr+= S.real
+			
+	l = np.array(l)	
 	if method=='Pos':
-		return A-Crp-Crm-Cm
-	elif method=='PosNeg':
-		return A-Crp-Cm
-	elif method=='justMode':
-		return Cm
-	elif method=='PosNeg_wMod':
-		return A -Crp
+		xv = (sum(l[l>=LM])-max(l))/float(N)
+		return floatingPointError(A-Cr-Cm),xv
 	elif method=='Pos_wMod':
-		return A -Crp-Crm
-	elif method=='NoMode':
-		return A-Cm
-
+		xv = (sum(l[l>=LM]))/float(N)
+		return floatingPointError(A -Cr),xv
 	else:
 		print "BUG"
 		return None
@@ -99,7 +95,7 @@ def Modulize(B):
 		if len(dQ)==0: continue
 		dQ,j = max(dQ)
 		cj = M[j]
-		if dQ>1e-14:
+		if dQ>1e-12:
 			count=0
 			C[cj,i] = True
 			C[ci,i] = False
@@ -238,29 +234,31 @@ def LoivenModM(B,n,ncpu=1,hierarchy=False):
 def ToCorrelation(XR,n=10, ncpu=1,hierarchy=False):
 	N,M = XR.shape
 	A = np.corrcoef(XR)
-	B = RMT(A,(N,M),'PosNeg_wMod')
-
+	B,var = RMT(A,(N,M),'Pos_wMod')
+	
 	H = [LoivenModM(B,n,ncpu)[0].astype(int)]
-
+	V = [[(0,var)]]
 	if hierarchy==False:
 		return H
 
 	while True:
+		xvar = []
 		M = H[-1]
 		
 		mx,h = 0,np.zeros(N)
 		
 		size = Counter(M)
-		#~ print "Level %d"%len(H)
+		
 		for c in set(M):
 			if size[c]>1:
 				Bs, XRs = deepcopy(B),deepcopy(XR)
 				XRs = XRs[np.where(M==c)]
 				As = np.corrcoef(XRs)
 				
-				Bs = RMT(As,XRs.shape,'PosNeg')
+				Bs,var = RMT(As,XRs.shape,'Pos')
 				Ms,q = LoivenModM(Bs,n,ncpu)
 				h[np.where(M==c)] = Ms+mx
+				xvar.append((c,var))
 				mx = h.max()+1
 			else:
 				h[np.where(M==c)] = mx
@@ -268,9 +266,10 @@ def ToCorrelation(XR,n=10, ncpu=1,hierarchy=False):
 
 		if len(set(h))==len(set(H[-1])): break
 		H.append(h.astype(int))
+		V.append(xvar)
 		
 		if set(h)==N: break
-	return H
+	return H,V
 
 def ToCorrelation2Level(XR,n=10, ncpu=1,hierarchy=False):
 	N,M = XR.shape
@@ -364,7 +363,7 @@ if __name__=='__main__':
 	file_r,file_w,n,ncpu,hierarchy = main(sys.argv[1:])
 
 	XR = np.array(pd.read_table(file_r,header=None))
-	M = ToCorrelation(XR,n,ncpu,hierarchy)
+	M,V = ToCorrelation(XR,n,ncpu,hierarchy)
 
 	OUT = pd.DataFrame(M).transpose()
 	OUT.to_csv(file_w,header=False,index=False,sep='\t')
