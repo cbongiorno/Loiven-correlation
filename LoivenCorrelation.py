@@ -51,6 +51,17 @@ def RMT(A,(N,M),method='Pos'):
 		print "BUG"
 		return None
 
+
+def My_RMT(X,method='Pos'):
+	
+	if method=='Pos_wMod':
+		return np.corrcoef(X)
+	
+	Xm = X-X.mean(axis=0)
+
+	return np.corrcoef(Xm)
+
+
 def UpdateSigma(sigma,R):
     return np.array([[p for x in c for p in sigma[x]] for c in R ])
 
@@ -271,35 +282,35 @@ def ToCorrelation(XR,n=10, ncpu=1,hierarchy=False):
 		if set(h)==N: break
 	return H,V
 
-def ToCorrelation2Level(XR,n=10, ncpu=1,hierarchy=False):
+
+def ToCorrelation_My(XR,n=10, ncpu=1,hierarchy=False):
 	N,M = XR.shape
-	A = np.corrcoef(XR)
-	B = RMT(A,(N,M),'Pos_wMod')
-
+	#A = np.corrcoef(XR)
+	B = My_RMT(XR,'Pos_wMod')
+	
 	H = [LoivenModM(B,n,ncpu)[0].astype(int)]
-
+	#V = [[(0,var)]]
 	if hierarchy==False:
 		return H
 
 	while True:
-		
+		#xvar = []
 		M = H[-1]
-		cx = Counter(M)
-		if cx.most_common()[0][1]/float(N)<0.8: break
 		
 		mx,h = 0,np.zeros(N)
 		
 		size = Counter(M)
-		#~ print "Level %d"%len(H)
+		
 		for c in set(M):
 			if size[c]>1:
 				Bs, XRs = deepcopy(B),deepcopy(XR)
 				XRs = XRs[np.where(M==c)]
 				As = np.corrcoef(XRs)
 				
-				Bs = RMT(As,XRs.shape,'Pos')
+				Bs = My_RMT(XRs,'Pos')
 				Ms,q = LoivenModM(Bs,n,ncpu)
 				h[np.where(M==c)] = Ms+mx
+				
 				mx = h.max()+1
 			else:
 				h[np.where(M==c)] = mx
@@ -308,9 +319,10 @@ def ToCorrelation2Level(XR,n=10, ncpu=1,hierarchy=False):
 		if len(set(h))==len(set(H[-1])): break
 		H.append(h.astype(int))
 		
+		
 		if set(h)==N: break
-		break
 	return H
+
 
 #~ 
 #~ def ToCorrelation(XR,n=10, ncpu=1,hierarchy=False):
