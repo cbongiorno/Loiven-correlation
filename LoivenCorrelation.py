@@ -73,12 +73,15 @@ def to_Membership(sigma,N):
     
 
 def Modulize(B):
-	Q = np.diagonal(B).sum()
+	Q = np.diagonal(B).sum()	#Initial Modularity
 	N = len(B)
-	M = dict(zip(range(N),range(N)))
-
+	M = dict(zip(range(N),range(N)))	#The Membership
+	
+	'Create Membership Matrix'
 	C = np.zeros((N,N))
 	np.fill_diagonal(C,True)
+	
+	'Shuffle the priority list of nodes'
 	Nx = range(N)
 	rd.shuffle(Nx)
 
@@ -86,26 +89,30 @@ def Modulize(B):
 	k=0
 	xcount = 0
 	Q0 = Q
+	'Do it until no futher improvement are possile'
 	while True:
 		
 		xcount+=1
 		if xcount%N==0: 
-			if Q>Q0: Q0 = Q
-			else: break
+			if Q>Q0: Q0 = Q	#if it is an improvement change Q -> Q0
+			else: break 	#if no improvment exit
 		
-		i = Nx[k]
 		
-		ci = M[i]
-
+		i = Nx[k]	#The node
+		ci = M[i]	#Th membership of the node
+		
+		'For any neighbors of node-i evaluate the increment of modularity'
 		dQ = []
 		for j in xrange(N):
-			cj = M[j]
+			cj = M[j]		#The membership of the j-node 
 			if ci==cj: continue
-			dQ.append((2*B[i,np.where(C[cj])].sum() - 2*B[i,np.where(C[ci])].sum() + 2*B[i,i],j))
 			
-		if len(dQ)==0: continue
-		dQ,j = max(dQ)
-		cj = M[j]
+			dQ.append((2*B[i,np.where(C[cj])].sum() - 2*B[i,np.where(C[ci])].sum() + 2*B[i,i],j))	#The increment of modularity
+			
+		if len(dQ)==0: continue	#No possible movement
+		dQ,j = max(dQ)	#Select the movement with the maximum modularity
+		cj = M[j]		#the destiantion membership
+		'If does not provide a sigificant improvement skip it'
 		if dQ>1e-12:
 			count=0
 			C[cj,i] = True
@@ -114,6 +121,7 @@ def Modulize(B):
 			Q+=dQ
 		else:
 			count+=1
+		'If no improvement break (why it is also up?)'
 		if count>=N:
 			break
 		k+=1
@@ -212,12 +220,14 @@ def LoivenMod_Hier(B):
     while True:
         
         C,Q = Modulize(Bt)
+
         if Q<=Q0: break
 
         Q0 = Q
         R =get_comm(C)
-        sigma = UpdateSigma(sigma,R)
+        sigma = UpdateSigma(sigma,R)  
         Bt = renormlize(Bt,R)
+
     
     return to_Membership(sigma,N),Q
    
@@ -235,10 +245,10 @@ def LoivenModM(B,n,ncpu=1,hierarchy=False):
 	'Multicall (ncpu process) for loiven'
 	if ncpu>1:
 		p = Pool(ncpu)
-		X = p.map(LoivenMod,[B]*n)
+		X = p.map(LoivenMod_Hier,[B]*n)
 		p.close()
 	else:
-		X = map(LoivenMod,[B]*n)
+		X = map(LoivenMod_Hier,[B]*n)
 
 	return max(X,key=lambda x:x[1])
 
@@ -307,10 +317,15 @@ def ToCorrelation_My(XR,n=10, ncpu=1,hierarchy=False):
 				XRs = XRs[np.where(M==c)]
 				As = np.corrcoef(XRs)
 				
+				Ns,Ms = XRs.shape
+				
+				LM = (1+np.sqrt(Ns/float(Ms)))**2
+				l = max(np.linalg.eigvals(As))
+				
 				Bs = My_RMT(XRs,'Pos')
 				Ms,q = LoivenModM(Bs,n,ncpu)
+					
 				h[np.where(M==c)] = Ms+mx
-				
 				mx = h.max()+1
 			else:
 				h[np.where(M==c)] = mx
@@ -321,6 +336,7 @@ def ToCorrelation_My(XR,n=10, ncpu=1,hierarchy=False):
 		
 		
 		if set(h)==N: break
+	
 	return H
 
 
