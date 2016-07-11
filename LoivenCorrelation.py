@@ -41,10 +41,10 @@ def RMT(A,(N,M),method='Pos',rem_mode=False):
 			Cr+= S.real
 			
 	l = np.array(l)	
-	if method=='Pos' and rem_mode==False:
+	if method=='Pos' and rem_mode==True:
 		xv = (sum(l[l>=LM])-max(l))/float(N)
 		return floatingPointError(A-Cr-Cm),xv
-	elif method=='Pos' and rem_mode==True:
+	elif method=='Pos' and rem_mode==False:
 		xv = (sum(l[l>=LM]))/float(N)
 		return floatingPointError(A -Cr),xv
 	elif method=='All' and rem_mode==False:
