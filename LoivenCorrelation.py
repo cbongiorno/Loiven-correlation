@@ -15,7 +15,7 @@ def floatingPointError(H):
 	H[np.logical_and(H<1e-12,H>-1e-12)]=0
 	return H
 
-def RMT(A,(N,M),method='Pos'):
+def RMT(A,(N,M),method='Pos',rem_mode=False):
 	'''
 	'Input Correlation Matrix, Dimension of TimeSeries (N,M),method'+
 	' "PosNeg" take out l{max} and l-<l<+l; "PosNeg_wMod" take out just l-<l<+l;'
@@ -41,20 +41,24 @@ def RMT(A,(N,M),method='Pos'):
 			Cr+= S.real
 			
 	l = np.array(l)	
-	if method=='Pos':
+	if method=='Pos' and rem_mode==False:
 		xv = (sum(l[l>=LM])-max(l))/float(N)
 		return floatingPointError(A-Cr-Cm),xv
-	elif method=='Pos_wMod':
+	elif method=='Pos' and rem_mode==True:
 		xv = (sum(l[l>=LM]))/float(N)
 		return floatingPointError(A -Cr),xv
+	elif method=='All' and rem_mode==False:
+		return A,1.0
+	elif method=='All' and rem_mode==True:
+		return floatingPointError(A-Cm),1.0 - l[0]/float(N)
 	else:
 		print "BUG"
 		return None
 
 
-def My_RMT(X,method='Pos'):
+def My_RMT(X,method='All',rem_mode=False):
 	
-	if method=='Pos_wMod':
+	if method=='All' and rem_mode==False:
 		return np.corrcoef(X)
 	
 	Xm = X-X.mean(axis=0)
@@ -252,10 +256,10 @@ def LoivenModM(B,n,ncpu=1,hierarchy=False):
 
 	return max(X,key=lambda x:x[1])
 
-def ToCorrelation(XR,n=10, ncpu=1,hierarchy=False):
+def ToCorrelation(XR,n=10, ncpu=1,method='Pos',hierarchy=False):
 	N,M = XR.shape
 	A = np.corrcoef(XR)
-	B,var = RMT(A,(N,M),'Pos_wMod')
+	B,var = RMT(A,(N,M),method,rem_mode=False)
 	
 	H = [LoivenModM(B,n,ncpu)[0].astype(int)]
 	V = [[(0,var)]]
@@ -276,7 +280,7 @@ def ToCorrelation(XR,n=10, ncpu=1,hierarchy=False):
 				XRs = XRs[np.where(M==c)]
 				As = np.corrcoef(XRs)
 				
-				Bs,var = RMT(As,XRs.shape,'Pos')
+				Bs,var = RMT(As,XRs.shape,method,rem_mode=True)
 				Ms,q = LoivenModM(Bs,n,ncpu)
 				h[np.where(M==c)] = Ms+mx
 				xvar.append((c,var))
@@ -293,10 +297,10 @@ def ToCorrelation(XR,n=10, ncpu=1,hierarchy=False):
 	return H,V
 
 
-def ToCorrelation_My(XR,n=10, ncpu=1,hierarchy=False):
+def ToCorrelation_My(XR,n=10, ncpu=1,method='All',hierarchy=False):
 	N,M = XR.shape
 	#A = np.corrcoef(XR)
-	B = My_RMT(XR,'Pos_wMod')
+	B = My_RMT(XR,method,rem_mode=False)
 	
 	H = [LoivenModM(B,n,ncpu)[0].astype(int)]
 	#V = [[(0,var)]]
@@ -322,7 +326,7 @@ def ToCorrelation_My(XR,n=10, ncpu=1,hierarchy=False):
 				LM = (1+np.sqrt(Ns/float(Ms)))**2
 				l = max(np.linalg.eigvals(As))
 				
-				Bs = My_RMT(XRs,'Pos')
+				Bs = My_RMT(XRs,method,rem_mode=True)
 				Ms,q = LoivenModM(Bs,n,ncpu)
 					
 				h[np.where(M==c)] = Ms+mx
