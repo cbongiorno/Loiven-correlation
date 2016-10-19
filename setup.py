@@ -1,8 +1,8 @@
 from distutils.core import setup,Extension
 
-setup(name='loi',
+setup(name='lou',
       version='0.01',
-      packages=['loi']
+      packages=['lou']
       #,
       #Extension=E
       )
