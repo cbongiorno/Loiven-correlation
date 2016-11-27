@@ -15,6 +15,46 @@ def floatingPointError(H):
 	H[np.logical_and(H<1e-12,H>-1e-12)]=0
 	return H
 
+
+def RMT_av(X,(N,M),method='Pos',rem_mode=False):
+	'''
+	'Input Correlation Matrix, Dimension of TimeSeries (N,M),method'+
+	' "PosNeg" take out l{max} and l-<l<+l; "PosNeg_wMod" take out just l-<l<+l;'
+	'''
+
+	LM = (1+np.sqrt(N/float(M)))**2
+	#Lm = (1-np.sqrt(N/float(M)))**2
+	
+
+	if rem_mode==True:
+		R = np.corrcoef( X - X.mean(axis=0) )
+	else:
+		R = np.corrcoef( X )
+	
+	l,v = np.linalg.eig(R)
+	
+	l,v = map( np.array,zip(* sorted(zip(l,v.T),reverse=True) ) )
+	v = v.T
+	
+	
+	Cr = np.zeros((len(l),len(l)))
+
+	for i in range(len(l)):
+		if l[i]<LM:
+			S = np.outer(v[i],v[i])*l[i]
+			Cr+= S.real
+			
+	l = np.array(l)	
+	if method=='Pos':
+		xv = (sum(l[l>=LM]))/float(N)
+		return floatingPointError(R -Cr),xv
+	elif method=='All':
+		return R,1.0
+	else:
+		print "BUG"
+		return None
+
+
 def RMT(A,(N,M),method='Pos',rem_mode=False):
 	'''
 	'Input Correlation Matrix, Dimension of TimeSeries (N,M),method'+
@@ -210,6 +250,48 @@ def Find_Membership(XR,n=10,ncpu=1,method='Pos',sgl=1e-12,hierarchy=True):
 				As = A[np.where(M==c)[0],:][:,np.where(M==c)[0]]
 				
 				Bs,var = RMT(As,(As.shape[0],XR.shape[1]),method,rem_mode=True)
+				Ms,q = LouvainModM(Bs,n,sgl,ncpu)
+				h[np.where(M==c)] = Ms+mx
+				xvar.append((c,var))
+				mx = h.max()+1
+			else:
+				h[np.where(M==c)] = mx
+				mx+=1
+
+		if len(set(h))==len(set(H[-1])): break
+		H.append(h.astype(int))
+		V.append(xvar)
+		
+		if set(h)==N: break
+	return H
+
+
+def Find_Membership_AV(XR,n=10,ncpu=1,method='Pos',sgl=1e-12,hierarchy=True):
+	
+	N,M = XR.shape
+	#A = np.corrcoef(XR)
+	B,var = RMT_av(XR,(N,M),method,rem_mode=False)
+	
+	H = [LouvainModM(B,n,sgl,ncpu)[0].astype(int)]
+	
+	V = [[(0,var)]]
+	if hierarchy==False:
+		return H
+
+	while True:
+		xvar = []
+		M = H[-1]
+		
+		mx,h = 0,np.zeros(N)
+		
+		size = Counter(M)
+		
+		for c in set(M):
+			if size[c]>1:
+				Bs = deepcopy(B)
+				#As = A[np.where(M==c)[0],:][:,np.where(M==c)[0]]
+				Xs = XR[np.where(M==c)[0]]
+				Bs,var = RMT_av(Xs,(Xs.shape[0],Xs.shape[1]),method,rem_mode=True)
 				Ms,q = LouvainModM(Bs,n,sgl,ncpu)
 				h[np.where(M==c)] = Ms+mx
 				xvar.append((c,var))
