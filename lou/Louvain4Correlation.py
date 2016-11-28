@@ -54,12 +54,25 @@ def RMT_av(X,(N,M),method='Pos',rem_mode=False):
 		print "BUG"
 		return None
 
+def Cntr1(R):
+	rr = R.copy()
+	np.fill_diagonal(rr,0)
+	np.fill_diagonal(rr,rr.max(axis=0))
+	
+	s = rr.sum(axis=0)/np.sqrt(rr.sum())
+	
+	return R - np.outer(s,s)
 
 def RMT(A,(N,M),method='Pos',rem_mode=False):
 	'''
 	'Input Correlation Matrix, Dimension of TimeSeries (N,M),method'+
 	' "PosNeg" take out l{max} and l-<l<+l; "PosNeg_wMod" take out just l-<l<+l;'
 	'''
+	
+	if method=='Cntr' and rem_mode==False:
+		return A,0
+	elif method=='Cntr' and rem_mode==True:
+		return Cntr1(A),0
 
 	LM = (1+np.sqrt(N/float(M)))**2
 	Lm = (1-np.sqrt(N/float(M)))**2
@@ -96,14 +109,7 @@ def RMT(A,(N,M),method='Pos',rem_mode=False):
 		return None
 
 
-def My_RMT(X,method='All',rem_mode=False):
-	
-	if method=='All' and rem_mode==False:
-		return np.corrcoef(X)
-	
-	Xm = X-X.mean(axis=0)
 
-	return np.corrcoef(Xm)
 
 
 def UpdateSigma(sigma,R):
