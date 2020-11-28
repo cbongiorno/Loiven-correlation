@@ -16,12 +16,13 @@ def floatingPointError(H):
 	return H
 
 
-def RMT_av(X,(N,M),method='Pos',rem_mode=False):
+def RMT_av(X,q,method='Pos',rem_mode=False):
 	'''
 	'Input Correlation Matrix, Dimension of TimeSeries (N,M),method'+
 	' "PosNeg" take out l{max} and l-<l<+l; "PosNeg_wMod" take out just l-<l<+l;'
 	'''
-
+	N,M = q
+	
 	LM = (1+np.sqrt(N/float(M)))**2
 	#Lm = (1-np.sqrt(N/float(M)))**2
 	
@@ -51,7 +52,7 @@ def RMT_av(X,(N,M),method='Pos',rem_mode=False):
 	elif method=='All':
 		return R,1.0
 	else:
-		print "BUG"
+		print("BUG")
 		return None
 
 def Cntr1(R):
@@ -63,11 +64,12 @@ def Cntr1(R):
 	
 	return R - np.outer(s,s)
 
-def RMT(A,(N,M),method='Pos',rem_mode=False):
+def RMT(A,q,method='Pos',rem_mode=False):
 	'''
 	'Input Correlation Matrix, Dimension of TimeSeries (N,M),method'+
 	' "PosNeg" take out l{max} and l-<l<+l; "PosNeg_wMod" take out just l-<l<+l;'
 	'''
+	N,M = q
 	
 	if method=='Cntr' and rem_mode==False:
 		return A,0
@@ -105,7 +107,7 @@ def RMT(A,(N,M),method='Pos',rem_mode=False):
 	elif method=='All' and rem_mode==True:
 		return floatingPointError(A-Cm),1.0 - l[0]/float(N)
 	else:
-		print "BUG"
+		print("BUG")
 		return None
 
 
@@ -132,7 +134,7 @@ def Modulize(B,sgl):
 	np.fill_diagonal(C,True)
 	
 	'Shuffle the priority list of nodes'
-	Nx = range(N)
+	Nx = list(range(N))
 	rd.shuffle(Nx)
 
 	count=0
@@ -153,7 +155,7 @@ def Modulize(B,sgl):
 		
 		'For any neighbors of node-i evaluate the increment of modularity'
 		dQ = []
-		for j in xrange(N):
+		for j in range(N):
 			cj = M[j]		#The membership of the j-node 
 			if ci==cj: continue
 			
@@ -187,27 +189,28 @@ def get_comm(C):
     return R
 
 def renormlize(B,R):
-    return np.array([[sum(B[l,m] for l in R[i] for m in R[j]) for i in xrange(len(R))] for j in xrange(len(R))])
+    return np.array([[sum(B[l,m] for l in R[i] for m in R[j]) for i in range(len(R))] for j in range(len(R))])
 
-def LouvainMod_Hier((B,sgl)):
-    N = len(B)
-    sigma = np.array([[i] for i in xrange(N)])
+def LouvainMod_Hier(q):
+	B,sgl = q
+	N = len(B)
+	sigma = np.array([[i] for i in range(N)])
 
-    Q0 = 0
-    Bt = deepcopy(B)
-    while True:
-        
-        C,Q = Modulize(Bt,sgl)
+	Q0 = 0
+	Bt = deepcopy(B)
+	while True:
+		
+		C,Q = Modulize(Bt,sgl)
 
-        if Q<=Q0: break
+		if Q<=Q0: break
 
-        Q0 = Q
-        R =get_comm(C)
-        sigma = UpdateSigma(sigma,R)  
-        Bt = renormlize(Bt,R)
+		Q0 = Q
+		R =get_comm(C)
+		sigma = UpdateSigma(sigma,R)  
+		Bt = renormlize(Bt,R)
 
-    
-    return to_Membership(sigma,N),Q
+
+	return to_Membership(sigma,N),Q
    #~ 
 #~ def LoivenMod(B):
 	#~ N = len(B)
@@ -231,13 +234,13 @@ def LouvainModM(B,n,sgl,ncpu):
 	return max(X,key=lambda x:x[1])
 
 def Find_Membership(XR,n=10,ncpu=1,method='Pos',sgl=1e-12,hierarchy=True):
-	
+
 	N,M = XR.shape
 	A = np.corrcoef(XR)
 	B,var = RMT(A,(N,M),method,rem_mode=False)
-	
+
 	H = [LouvainModM(B,n,sgl,ncpu)[0].astype(int)]
-	
+
 	V = [[(0,var)]]
 	if hierarchy==False:
 		return H
@@ -313,47 +316,7 @@ def Find_Membership_AV(XR,n=10,ncpu=1,method='Pos',sgl=1e-12,hierarchy=True):
 		if set(h)==N: break
 	return H
 
-def main(argv):
-   inputfile = ''
-   outputfile = ''
-   n = 10
-   ncpu = 1
-   hierarchy=False
-   
-   try:
-      opts, args = getopt.getopt(argv,"hi:o:n:c:H",["ifile=","ofile=","nrun=","ncpu=","hier="])
-   except getopt.GetoptError:
-      print 'LoivenCorrelation.py -i <inputfile> -o <outputfile> --nrun <run> --ncpu <ncpu> --hier <bool>' 
-      sys.exit(2)
-   for opt, arg in opts:
-      if opt == '-h':
-         print 'LoivenCorrelation.py -i <inputfile> -o <outputfile> --nrun <run> --ncpu <ncpu> --hier <bool>' 
-         sys.exit()
-      elif opt in ("-i", "--ifile"):
-         inputfile = arg
-      elif opt in ("-o", "--ofile"):
-         outputfile = arg
-      elif opt in ("-n", "--nrun"):
-		n = int(arg)
-      elif opt in ("-c", "--ncpu"):
-         ncpu = int(arg) 
-                      
-      elif opt in ("-H", "--hier"):
-		 hierarchy = arg=='1'
-   
-   return inputfile,outputfile,n,ncpu,hierarchy
 
-	
-if __name__=='__main__':
-	
-	file_r,file_w,n,ncpu,hierarchy = main(sys.argv[1:])
-
-	XR = np.array(pd.read_table(file_r,header=None))
-	M,V = Find_Membership(XR,n,ncpu,hierarchy)
-
-	OUT = pd.DataFrame(M).transpose()
-	OUT.to_csv(file_w,header=False,index=False,sep='\t')
-	
 
 	
 
